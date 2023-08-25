@@ -59,6 +59,13 @@ const ChatIcons: React.FC<ChatIconsProps> = ({
     setSearchKey(event.target.value);
   }
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      setCurrentContextSearchKey(searchKey);
+    }
+  };
+
   useEffect(() => {
     const handleRetrievalQAChain = async () => {
       if (selectedChain !== ChainType.RETRIEVAL_QA_CHAIN) {
@@ -174,6 +181,7 @@ const ChatIcons: React.FC<ChatIconsProps> = ({
                 type="text"
                 placeholder={currentContextType}
                 value={searchKey}
+                onKeyDown={handleKeyDown}
                 onChange={handleSearchKeyChange}
               />
               <button className="chat-icon-button" onClick={() => setCurrentContextSearchKey(searchKey)}>
