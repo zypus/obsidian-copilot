@@ -18,7 +18,14 @@ import {
   RetrievalQAChain
 } from "langchain/chains";
 import moment from 'moment';
-import { TFile } from 'obsidian';
+import { CachedMetadata, Notice, TFile, TFolder } from 'obsidian';
+
+export function notifyUser(message: string, logError = true) {
+	new Notice(message)
+	if (logError) {
+		console.error(message)
+	}
+}
 
 export const stringToChainType = (chain: string): ChainType => {
   switch(chain) {
@@ -96,8 +103,91 @@ export async function getFileContent(file: TFile): Promise<string | null> {
   return await this.app.vault.read(file);
 }
 
+export async function getCombinedFolderContent(folder: TFolder): Promise<string | null> {
+	const children = folder.children
+
+	if (children.length === 0) return null;
+
+	const contents = await Promise.all(children.map(async (child) => {
+		if (child instanceof TFile) {
+            const content = await getFileContent(child);
+            if (content === null) {
+              return null;
+            } else {
+              return `# ${child.name}\n\n${content}`;
+            }
+        } else if (child instanceof TFolder) {
+			return await getCombinedFolderContent(child);
+		} else {
+			return null
+		}
+	}))
+
+	return contents.filter((content) => content!== null).join('\n\n')
+}
+
 export function getFileName(file: TFile): string {
   return file.basename;
+}
+
+export function getFolderName(folder: TFolder): string {
+  return folder.name;
+}
+export function getFrontmatterTags(fileCache: CachedMetadata): string[] {
+	const frontmatter = fileCache.frontmatter;
+	if (!frontmatter) return [];
+
+	// You can have both a 'tag' and 'tags' key in frontmatter.
+	const frontMatterValues = Object.entries(frontmatter);
+	if (!frontMatterValues.length) return [];
+
+	const tagPairs = frontMatterValues.filter(([key, value]) => {
+		const lowercaseKey = key.toLowerCase();
+
+		// In Obsidian, these are synonymous.
+		return lowercaseKey === "tags" || lowercaseKey === "tag";
+	});
+
+	if (!tagPairs) return [];
+
+	const tags = tagPairs
+		.flatMap(([key, value]) => {
+			if (typeof value === "string") {
+				// separator can either be comma or space separated
+				return value.split(/,|\s+/).map((v) => v.trim());
+			} else if (Array.isArray(value)) {
+				return value as string[];
+			}
+		})
+		.filter((v) => !!v) as string[]; // fair to cast after filtering out falsy values
+
+	return tags;
+}
+
+export function getFileTags(file: TFile): string[] {
+	const fileCache = app.metadataCache.getFileCache(file);
+	if (!fileCache) return [];
+
+	const tagsInFile: string[] = [];
+	if (fileCache.frontmatter) {
+		tagsInFile.push(...getFrontmatterTags(fileCache));
+	}
+
+	if (fileCache.tags && Array.isArray(fileCache.tags)) {
+		tagsInFile.push(...fileCache.tags.map((v) => v.tag.replace(/^#/, "")));
+	}
+
+	return tagsInFile;
+}
+
+export function getMarkdownFilesWithTag(tag: string): TFile[] {
+	const targetTag = tag.replace(/^#/, "");
+
+	return app.vault.getMarkdownFiles().filter((f) => {
+		const fileTags = getFileTags(f);
+
+		return fileTags.includes(targetTag);
+	});
 }
 
 export function sanitizeSettings(settings: CopilotSettings): CopilotSettings {

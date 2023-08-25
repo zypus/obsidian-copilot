@@ -1,39 +1,26 @@
 import { SetChainOptions } from '@/aiState';
-import {
-  AI_SENDER,
-  ChatModelDisplayNames,
-} from '@/constants';
-import {
-  ChatMessage
-} from '@/sharedState';
-import {
-  getFileContent,
-  getFileName,
-} from '@/utils';
+import { AI_SENDER, ChatModelDisplayNames, } from '@/constants';
+import { ChatMessage } from '@/sharedState';
 import { Notice } from 'obsidian';
-import {
-  useEffect,
-  useState,
-} from 'react';
+import React, { useEffect, useState, } from 'react';
 
-import { ChainType } from '@/chainFactory';
-import {
-  RefreshIcon, SaveAsNoteIcon,
-  StopIcon,
-  UseActiveNoteAsContextIcon
-} from '@/components/Icons';
+import { ChainContextType, ChainType } from '@/chainFactory';
+import { RefreshIcon, SaveAsNoteIcon, StopIcon, UseActiveNoteAsContextIcon } from '@/components/Icons';
 import { stringToChainType } from '@/utils';
-import React from 'react';
+import { getChainContext } from '@/chainContext'
 
 interface ChatIconsProps {
   currentModel: string;
   setCurrentModel: (model: string) => void;
   currentChain: ChainType;
   setCurrentChain: (chain: ChainType, options?: SetChainOptions) => void;
+  currentContextType: ChainContextType;
+  setCurrentContextType: (context: ChainContextType) => void;
+  currentContextSearchKey: string,
+  setCurrentContextSearchKey: (key: string) => void;
   onStopGenerating: () => void;
   onNewChat: () => void;
   onSaveAsNote: () => void;
-  onForceRebuildActiveNoteContext: () => void;
   addMessage: (message: ChatMessage) => void;
 }
 
@@ -42,13 +29,17 @@ const ChatIcons: React.FC<ChatIconsProps> = ({
   setCurrentModel,
   currentChain,
   setCurrentChain,
+  currentContextType,
+  setCurrentContextType,
+  currentContextSearchKey,
+  setCurrentContextSearchKey,
   onStopGenerating,
   onNewChat,
   onSaveAsNote,
-  onForceRebuildActiveNoteContext,
   addMessage,
 }) => {
   const [selectedChain, setSelectedChain] = useState<ChainType>(currentChain);
+  const [searchKey, setSearchKey] = useState<string>(currentContextSearchKey);
 
   const handleModelChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     setCurrentModel(event.target.value);
@@ -56,6 +47,16 @@ const ChatIcons: React.FC<ChatIconsProps> = ({
 
   const handleChainChange = async (event: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedChain(stringToChainType(event.target.value));
+  }
+
+  const handleContextChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setCurrentContextSearchKey('')
+    setSearchKey('')
+    setCurrentContextType(event.target.value as ChainContextType);
+  }
+
+  const handleSearchKeyChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchKey(event.target.value);
   }
 
   useEffect(() => {
@@ -70,28 +71,29 @@ const ChatIcons: React.FC<ChatIconsProps> = ({
         return;
       }
 
-      const file = app.workspace.getActiveFile();
-      if (!file) {
-        new Notice('No active note found.');
-        console.error('No active note found.');
+      if ((currentContextType == ChainContextType.NOTE || currentContextType == ChainContextType.FOLDER || currentContextType == ChainContextType.TAG) && currentContextSearchKey == '') {
+        new Notice(`Please provide a ${currentContextType}`);
+        return null
+      }
+
+      const chainContext = await getChainContext(currentContextType, currentContextSearchKey);
+      if (!chainContext) {
+        new Notice('No context found');
+        console.error('No context found.');
         return;
       }
-      const noteContent = await getFileContent(file);
-      const noteName = getFileName(file);
 
       const activeNoteOnMessage: ChatMessage = {
         sender: AI_SENDER,
-        message: `OK Feel free to ask me questions about [[${noteName}]].`,
+        message: `OK Feel free to ask me questions about ${chainContext.name}.`,
         isVisible: true,
       };
       addMessage(activeNoteOnMessage);
-      if (noteContent) {
-        setCurrentChain(selectedChain, { noteContent });
-      }
+      setCurrentChain(selectedChain, {noteContent: chainContext.content});
     };
 
     handleRetrievalQAChain();
-  }, [selectedChain]);
+  }, [selectedChain, currentContextType, currentContextSearchKey]);
 
   return (
     <div className='chat-icons-container'>
@@ -141,15 +143,47 @@ const ChatIcons: React.FC<ChatIconsProps> = ({
             onChange={handleChainChange}
           >
             <option value='llm_chain'>Conversation</option>
-            <option value='retrieval_qa'>QA: Active Note</option>
+            <option value='retrieval_qa'>QA: Context</option>
           </select>
           <span className="tooltip-text">Mode Selection</span>
         </div>
       </div>
-      <button className='chat-icon-button' onClick={onForceRebuildActiveNoteContext}>
-        <UseActiveNoteAsContextIcon className='icon-scaler' />
-        <span className="tooltip-text">Rebuild Index for Active Note</span>
-      </button>
+      {currentChain === 'retrieval_qa' && (
+        <div className="chat-context-container">
+          <div className="chat-icon-selection-tooltip">
+            <div className="select-wrapper">
+              <select
+                id="aiChainContext"
+                className="chat-icon-selection"
+                value={currentContextType}
+                onChange={handleContextChange}
+              >
+                <option value="active_note">Active Note</option>
+                {/*<option value="selection">Selection</option>*/}
+                <option value="note">Note</option>
+                <option value="folder">Folder</option>
+                <option value="tag">Tag</option>
+              </select>
+              <span className="tooltip-text">Context</span>
+            </div>
+          </div>
+          {(currentContextType === 'note' || currentContextType === 'folder' || currentContextType === 'tag') && (
+            <div className="chat-search-key-container">
+              <input
+                className="chat-search-key"
+                type="text"
+                placeholder={currentContextType}
+                value={searchKey}
+                onChange={handleSearchKeyChange}
+              />
+              <button className="chat-icon-button" onClick={() => setCurrentContextSearchKey(searchKey)}>
+                <UseActiveNoteAsContextIcon className="icon-scaler" />
+                <span className="tooltip-text">Update Context</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

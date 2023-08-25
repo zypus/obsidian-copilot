@@ -1,5 +1,4 @@
 import AIState, { useAIState } from '@/aiState';
-import { ChainType } from '@/chainFactory';
 import ChatIcons from '@/components/ChatComponents/ChatIcons';
 import ChatInput from '@/components/ChatComponents/ChatInput';
 import ChatMessages from '@/components/ChatComponents/ChatMessages';
@@ -18,8 +17,6 @@ import {
   fixGrammarSpellingSelectionPrompt,
   formatDateTime,
   getChatContext,
-  getFileContent,
-  getFileName,
   glossaryPrompt,
   removeUrlsFromSelectionPrompt,
   rewriteLongerSelectionPrompt,
@@ -31,9 +28,8 @@ import {
   summarizePrompt,
   tocPrompt,
 } from '@/utils';
-import VectorDBManager from '@/vectorDBManager';
 import { EventEmitter } from 'events';
-import { Notice, TFile } from 'obsidian';
+import { TFile } from 'obsidian';
 import React, {
   useContext,
   useEffect,
@@ -61,7 +57,7 @@ const Chat: React.FC<ChatProps> = ({
     chatHistory, addMessage, clearMessages,
   ] = useSharedState(sharedState);
   const [
-    currentModel, setModel, currentChain, setChain, clearChatMemory,
+    currentModel, setModel, currentChain, setChain, currentContextType, setCurrentContextType, currentContextSearchKey, setCurrentContextSearchKey, clearChatMemory,
   ] = useAIState(aiState);
   const [currentAiMessage, setCurrentAiMessage] = useState('');
   const [inputMessage, setInputMessage] = useState('');
@@ -127,41 +123,6 @@ const Chat: React.FC<ChatProps> = ({
     } catch (error) {
       console.error('Error saving chat as note:', error);
     }
-  };
-
-  const forceRebuildActiveNoteContext = async () => {
-    if (!app) {
-      console.error('App instance is not available.');
-      return;
-    }
-
-    const file = app.workspace.getActiveFile();
-    if (!file) {
-      new Notice('No active note found.');
-      console.error('No active note found.');
-      return;
-    }
-    const noteContent = await getFileContent(file);
-    const noteName = getFileName(file);
-    if (!noteContent) {
-      new Notice('No note content found.');
-      console.error('No note content found.');
-      return;
-    }
-
-    const docHash = VectorDBManager.getDocumentHash(noteContent);
-    await aiState.buildIndex(noteContent, docHash);
-    const activeNoteOnMessage: ChatMessage = {
-      sender: AI_SENDER,
-      message: `Reading [[${noteName}]]...\n\n Please switch to "QA: Active Note" in Mode Selection to ask questions about it.`,
-      isVisible: true,
-    };
-
-    if (currentChain === ChainType.RETRIEVAL_QA_CHAIN) {
-      setChain(ChainType.RETRIEVAL_QA_CHAIN, { noteContent });
-    }
-
-    addMessage(activeNoteOnMessage);
   };
 
   const clearCurrentAiMessage = () => {
@@ -301,6 +262,10 @@ const Chat: React.FC<ChatProps> = ({
           setCurrentModel={setModel}
           currentChain={currentChain}
           setCurrentChain={setChain}
+          currentContextType={currentContextType}
+          setCurrentContextType={setCurrentContextType}
+          currentContextSearchKey={currentContextSearchKey}
+          setCurrentContextSearchKey={setCurrentContextSearchKey}
           onStopGenerating={handleStopGenerating}
           onNewChat={
             () => {
@@ -310,7 +275,6 @@ const Chat: React.FC<ChatProps> = ({
             }
           }
           onSaveAsNote={handleSaveAsNote}
-          onForceRebuildActiveNoteContext={forceRebuildActiveNoteContext}
           addMessage={addMessage}
         />
         <ChatInput

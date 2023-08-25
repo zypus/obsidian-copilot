@@ -36,6 +36,25 @@ If your plugin does not need CSS, delete this file.
   flex-wrap: wrap;
 }
 
+.chat-context-container {
+    display: flex;
+    order: 1;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.chat-search-key-container {
+    display: flex;
+    order: 1;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.chat-search-key {
+    height: 32px;
+    width: 100px;
+}
+
 .icon-scaler {
   transform: scale(1.6);
 }

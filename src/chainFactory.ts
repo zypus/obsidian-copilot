@@ -37,6 +37,14 @@ export enum ChainType {
   CONVERSATIONAL_RETRIEVAL_QA_CHAIN = 'conversational_retrieval_chain',
 }
 
+export enum ChainContextType {
+	ACTIVE_NOTE = 'active_note',
+	SELECTION = 'selection',
+	NOTE = 'note',
+	FOLDER = 'folder',
+	TAG = 'tag'
+}
+
 class ChainFactory {
   public static instances: Map<string, BaseChain> = new Map();
 

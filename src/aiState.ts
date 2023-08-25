@@ -1,5 +1,5 @@
 import ChainFactory, {
-  ChainType
+  ChainType, ChainContextType
 } from '@/chainFactory';
 import {
   AI_SENDER,
@@ -642,11 +642,17 @@ export function useAIState(
   (model: string) => void,
   ChainType,
   (chain: ChainType, options?: SetChainOptions) => void,
+  ChainContextType,
+  (contextType: ChainContextType) => void,
+  string,
+  (searchKey: string) => void,
   () => void,
 ] {
   const { langChainParams } = aiState;
   const [currentModel, setCurrentModel] = useState<string>(langChainParams.modelDisplayName);
   const [currentChain, setCurrentChain] = useState<ChainType>(langChainParams.chainType);
+  const [currentChainContextType, setCurrentChainContextType] = useState<ChainContextType>(ChainContextType.ACTIVE_NOTE);
+  const [currentContextSearchKey, setCurrentContextSearchKey] = useState<string>('');
   const [, setChatMemory] = useState<BufferWindowMemory | null>(aiState.memory);
 
   const clearChatMemory = () => {
@@ -669,6 +675,10 @@ export function useAIState(
     setModel,
     currentChain,
     setChain,
+    currentChainContextType,
+    setCurrentChainContextType,
+    currentContextSearchKey,
+    setCurrentContextSearchKey,
     clearChatMemory,
   ];
 }
